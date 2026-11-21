@@ -1,0 +1,38 @@
+# ViralCut AI – Backend Dockerfile
+# Python 3.11 + ffmpeg + system deps for OpenCV / mediapipe
+
+FROM python:3.11-slim AS base
+
+# Prevent Python from writing .pyc files and enable unbuffered output
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# System dependencies: ffmpeg, OpenCV native libs, build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python deps first (layer cache)
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY backend/ .
+
+# Create storage directories
+RUN mkdir -p /app/storage/uploads /app/storage/processed /app/storage/thumbnails /app/storage/exports
+
+EXPOSE 8000
+
+# Default entrypoint: run the FastAPI server
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
